@@ -12,8 +12,8 @@ function chunkArray(arr, size) {
 function buildSerpTask(keyword, device) {
   return {
     keyword,
-    location_code: config.locationCode,
-    language_code: config.languageCode,
+    location_name: config.googleLocationName,
+    language_name: config.googleLanguageName,
     device,
     os: device === 'mobile' ? 'android' : 'windows',
     depth: config.serpDepth,
@@ -24,32 +24,21 @@ function buildSerpTask(keyword, device) {
 async function postSerpTasks(req, res) {
   try {
     validateConfig();
-    const keywords = await bq.loadActiveKeywords();
-    const trackedDomains = await bq.loadTrackedDomains();
-
-    console.log(`[postSerpTasks] resolved GCP_PROJECT_ID=${config.projectId}`);
-    console.log(`[postSerpTasks] resolved BIGQUERY_DATASET=${config.dataset}`);
-    console.log(`[postSerpTasks] resolved BIGQUERY_LOCATION=${config.bigQueryLocation}`);
-    console.log(`[postSerpTasks] active keyword count=${keywords.length}`);
-    console.log(`[postSerpTasks] active tracked domain count=${trackedDomains.length}`);
+    const keywords = await bq.getActiveKeywords();
     if (!keywords.length) return res.status(200).json({ message: 'No active keywords found' });
 
     const runId = await bq.createSerpRun({ run_type: 'weekly_serp', status: 'posted' });
     const taskPayload = [];
 
-    console.log(`[postSerpTasks] devices used=${config.devices.join(',')}`);
     for (const row of keywords) {
-      for (const device of config.devices) {
-        taskPayload.push(buildSerpTask(row.keyword, device));
-      }
+      taskPayload.push(buildSerpTask(row.keyword, 'desktop'));
+      taskPayload.push(buildSerpTask(row.keyword, 'mobile'));
     }
-    console.log(`[postSerpTasks] generated task payload count=${taskPayload.length}`);
 
     let totalPosted = 0;
     for (const chunk of chunkArray(taskPayload, config.maxTasksPerPost)) {
       const response = await d4s.postSerpTasks(chunk);
-      const postedTasks = response.tasks || [];
-      console.log(`[postSerpTasks] DataForSEO post response count=${postedTasks.length}`);
+      const postedTasks = (response.tasks || []).flatMap(t => t.result || []);
       const apiRows = postedTasks.map((t) => ({
         run_id: runId,
         task_id: t.id,
@@ -62,7 +51,6 @@ async function postSerpTasks(req, res) {
         http_code: t.status_code || null,
       }));
       await bq.insertApiTasks(apiRows);
-      console.log(`[postSerpTasks] inserted api_tasks row count=${apiRows.length}`);
       totalPosted += apiRows.length;
     }
 
@@ -157,8 +145,8 @@ async function postSearchVolumeTasks(req, res) {
     if (!keywords.length) return res.status(200).json({ message: 'No active keywords found' });
 
     const payload = [{
-      location_code: config.locationCode,
-      language_code: config.languageCode,
+      location_name: config.googleLocationName,
+      language_name: config.googleLanguageName,
       keywords,
     }];
 

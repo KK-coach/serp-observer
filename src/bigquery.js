@@ -8,30 +8,21 @@ function table(name) {
   return bq.dataset(config.dataset).table(name);
 }
 
-async function loadActiveKeywords() {
-  console.log(`[BigQuery] loadActiveKeywords project=${config.projectId} dataset=${config.dataset} location=${config.bigQueryLocation}`);
+async function getActiveKeywords() {
   const query = `
     SELECT keyword
     FROM \`${config.projectId}.${config.dataset}.keyword_targets\`
     WHERE is_active = TRUE
     ORDER BY keyword
   `;
-  const [rows] = await bq.query({ query, location: config.bigQueryLocation });
-  console.log(`[BigQuery] loadActiveKeywords count=${rows.length}`);
+  const [rows] = await bq.query({ query });
   return rows;
 }
 
-async function loadTrackedDomains() {
-  console.log(`[BigQuery] loadTrackedDomains project=${config.projectId} dataset=${config.dataset} location=${config.bigQueryLocation}`);
-  const query = `
-    SELECT domain
-    FROM \`${config.projectId}.${config.dataset}.tracked_domains\`
-    WHERE is_active = TRUE
-    ORDER BY domain
-  `;
-  const [rows] = await bq.query({ query, location: config.bigQueryLocation });
-  console.log(`[BigQuery] loadTrackedDomains count=${rows.length}`);
-  return rows.map((r) => r.domain.toLowerCase());
+async function getTrackedDomains() {
+  const query = `SELECT domain FROM \`${config.projectId}.${config.dataset}.tracked_domains\` WHERE is_active = TRUE`;
+  const [rows] = await bq.query({ query });
+  return rows.map(r => r.domain.toLowerCase());
 }
 
 async function createSerpRun(meta) {
@@ -56,7 +47,7 @@ async function getPendingApiTasks(taskType) {
     ORDER BY created_at
     LIMIT 500
   `;
-  const [rows] = await bq.query({ query, params: { taskType }, location: config.bigQueryLocation });
+  const [rows] = await bq.query({ query, params: { taskType } });
   return rows;
 }
 
@@ -66,7 +57,7 @@ async function markApiTaskCompleted(taskId, extra = {}) {
     SET status = 'completed', fetched_at = CURRENT_TIMESTAMP(), http_code = @httpCode
     WHERE task_id = @taskId
   `;
-  await bq.query({ query, params: { taskId, httpCode: extra.http_code || null }, location: config.bigQueryLocation });
+  await bq.query({ query, params: { taskId, httpCode: extra.http_code || null } });
 }
 
 async function markApiTaskFailed(taskId, reason) {
@@ -75,14 +66,12 @@ async function markApiTaskFailed(taskId, reason) {
     SET status = 'failed', error_message = @reason, fetched_at = CURRENT_TIMESTAMP()
     WHERE task_id = @taskId
   `;
-  await bq.query({ query, params: { taskId, reason }, location: config.bigQueryLocation });
+  await bq.query({ query, params: { taskId, reason } });
 }
 
 module.exports = {
-  getActiveKeywords: loadActiveKeywords,
-  getTrackedDomains: loadTrackedDomains,
-  loadActiveKeywords,
-  loadTrackedDomains,
+  getActiveKeywords,
+  getTrackedDomains,
   createSerpRun,
   insertApiTasks,
   insertSerpItems,
