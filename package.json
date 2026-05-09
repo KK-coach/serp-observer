@@ -1,15 +1,19 @@
 {
   "name": "agrobook-serp-monitor",
   "version": "1.0.0",
-  "description": "Cloud Run backend for Agrobook SERP monitoring with DataForSEO and BigQuery",
-  "main": "server.js",
+  "description": "Cloud Functions v2 backend for Agrobook SERP monitoring with DataForSEO and BigQuery",
+  "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "functions-framework --target=postSerpTasks --port=8080",
+    "start:post-serp": "functions-framework --target=postSerpTasks --port=8080",
+    "start:fetch-serp": "functions-framework --target=fetchSerpResults --port=8081",
+    "start:post-volume": "functions-framework --target=postSearchVolumeTasks --port=8082",
+    "start:fetch-volume": "functions-framework --target=fetchSearchVolumeResults --port=8083"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^7.9.0",
-    "axios": "^1.7.7",
-    "express": "^4.21.1"
+    "@google-cloud/functions-framework": "^3.4.6",
+    "axios": "^1.7.7"
   }
 }
