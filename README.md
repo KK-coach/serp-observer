@@ -1,92 +1,54 @@
-# Agrobook SERP Monitor (Cloud Functions v2 + BigQuery)
+# Agrobook SERP Monitor (Cloud Run Express Service)
 
-Node.js 22 backend for SERP monitoring MVP using DataForSEO Standard Queue APIs and BigQuery.
+Node.js backend for SERP monitoring with DataForSEO and BigQuery, deployed as **one Cloud Run service** with one Express app.
 
-## 1) Create BigQuery dataset
+## Endpoints
 
-```bash
-bq --location=EU mk --dataset agrobook-serp-monitor:agrobook_serp_monitor
-```
+- `GET /health`
+- `POST /post-serp-tasks`
+- `POST /fetch-serp-results`
+- `POST /post-search-volume-tasks`
+- `POST /fetch-search-volume-results`
 
-## 2) Run schema SQL
-
-```bash
-bq query --use_legacy_sql=false < sql/create_tables.sql
-```
-
-## 3) Required environment variables
+## Environment variables
 
 Copy `.env.example` to `.env` for local development.
 
-- `GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor`
-- `BQ_DATASET=agrobook_serp_monitor`
+- `GCP_PROJECT_ID=gen-lang-client-0073794959`
+- `BIGQUERY_DATASET=agrobook_serp_monitor`
+- `BIGQUERY_LOCATION=EU`
+- `LOCATION_CODE=2348`
+- `LANGUAGE_CODE=hu`
+- `SERP_DEVICES=desktop,mobile`
 - `DATAFORSEO_LOGIN=...`
 - `DATAFORSEO_PASSWORD=...`
 - `TARGET_DOMAIN=agrobook.hu`
-- `GOOGLE_LOCATION_NAME=Hungary`
-- `GOOGLE_LANGUAGE_NAME=Hungarian`
-- `GOOGLE_DOMAIN=google.hu`
-- `SERP_DEPTH=20`
 
-> Use Secret Manager for production secrets and map them as env vars in deploy.
-
-## 4) Deploy to Google Cloud Functions v2
-
-Deploy each HTTP function:
-
-```bash
-gcloud functions deploy postSerpTasks --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=postSerpTasks --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor,TARGET_DOMAIN=agrobook.hu,GOOGLE_LOCATION_NAME=Hungary,GOOGLE_LANGUAGE_NAME=Hungarian,GOOGLE_DOMAIN=google.hu,SERP_DEPTH=20 --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
-
-gcloud functions deploy fetchSerpResults --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=fetchSerpResults --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor,TARGET_DOMAIN=agrobook.hu --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
-
-gcloud functions deploy postSearchVolumeTasks --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=postSearchVolumeTasks --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor,GOOGLE_LOCATION_NAME=Hungary,GOOGLE_LANGUAGE_NAME=Hungarian --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
-
-gcloud functions deploy fetchSearchVolumeResults --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=fetchSearchVolumeResults --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
-```
-
-## 5) Trigger `postSerpTasks`
-
-```bash
-curl -X POST "https://<region>-<project>.cloudfunctions.net/postSerpTasks"
-```
-
-## 6) Trigger `fetchSerpResults`
-
-```bash
-curl -X POST "https://<region>-<project>.cloudfunctions.net/fetchSerpResults"
-```
-
-## 7) Schedule weekly SERP monitoring
-
-Use Cloud Scheduler:
-
-1. Weekly cron for `postSerpTasks` (e.g. Monday 06:00 UTC)
-2. Frequent follow-up cron for `fetchSerpResults` (e.g. every 30 min)
-
-Example:
-
-```bash
-gcloud scheduler jobs create http serp-post-weekly --schedule="0 6 * * 1" --uri="https://<url>/postSerpTasks" --http-method=POST
-
-gcloud scheduler jobs create http serp-fetch-halfhourly --schedule="*/30 * * * *" --uri="https://<url>/fetchSerpResults" --http-method=POST
-```
-
-## 8) Schedule monthly search volume refresh
-
-```bash
-gcloud scheduler jobs create http volume-post-monthly --schedule="0 4 1 * *" --uri="https://<url>/postSearchVolumeTasks" --http-method=POST
-
-gcloud scheduler jobs create http volume-fetch-daily --schedule="0 5 * * *" --uri="https://<url>/fetchSearchVolumeResults" --http-method=POST
-```
-
-## Local testing (Functions Framework)
+## Run locally
 
 ```bash
 npm install
-npm run start:post-serp
-npm run start:fetch-serp
-npm run start:post-volume
-npm run start:fetch-volume
+npm start
 ```
 
-Then call local endpoints with `curl -X POST http://localhost:<port>`.
+Service listens on `PORT` or `8080`.
+
+## Deploy to Cloud Run (single service)
+
+```bash
+gcloud run deploy serp-observer \
+  --source . \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --set-env-vars GCP_PROJECT_ID=gen-lang-client-0073794959,BIGQUERY_DATASET=agrobook_serp_monitor,BIGQUERY_LOCATION=EU,LOCATION_CODE=2348,LANGUAGE_CODE=hu,SERP_DEVICES=desktop,mobile,TARGET_DOMAIN=agrobook.hu \
+  --set-secrets DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
+```
+
+## Scheduler URLs
+
+Use Cloud Scheduler HTTP jobs against the deployed Cloud Run base URL:
+
+- `POST https://<cloud-run-url>/post-serp-tasks`
+- `POST https://<cloud-run-url>/fetch-serp-results`
+- `POST https://<cloud-run-url>/post-search-volume-tasks`
+- `POST https://<cloud-run-url>/fetch-search-volume-results`

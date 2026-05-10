@@ -12,33 +12,50 @@ function chunkArray(arr, size) {
 function buildSerpTask(keyword, device) {
   return {
     keyword,
-    location_name: config.googleLocationName,
-    language_name: config.googleLanguageName,
+    location_code: config.locationCode,
+    language_code: config.languageCode,
     device,
     os: device === 'mobile' ? 'android' : 'windows',
     depth: config.serpDepth,
-    se_domain: config.googleDomain,
   };
 }
 
 async function postSerpTasks(req, res) {
   try {
+    console.log('POST SERP TASKS HANDLER ACTIVE');
     validateConfig();
+
+    console.log(`resolved GCP_PROJECT_ID: ${config.projectId}`);
+    console.log(`resolved BIGQUERY_DATASET: ${config.dataset}`);
+    console.log(`resolved BIGQUERY_LOCATION: ${config.bigQueryLocation}`);
+
     const keywords = await bq.getActiveKeywords();
+    const trackedDomains = await bq.getTrackedDomains();
+
+    console.log(`active keyword count: ${keywords.length}`);
+    console.log(`active tracked domain count: ${trackedDomains.length}`);
+    console.log(`devices: ${JSON.stringify(config.serpDevices)}`);
+
     if (!keywords.length) return res.status(200).json({ message: 'No active keywords found' });
 
     const runId = await bq.createSerpRun({ run_type: 'weekly_serp', status: 'posted' });
     const taskPayload = [];
 
     for (const row of keywords) {
-      taskPayload.push(buildSerpTask(row.keyword, 'desktop'));
-      taskPayload.push(buildSerpTask(row.keyword, 'mobile'));
+      for (const device of config.serpDevices) {
+        taskPayload.push(buildSerpTask(row.keyword, device));
+      }
     }
+
+    console.log(`generated payload count: ${taskPayload.length}`);
 
     let totalPosted = 0;
     for (const chunk of chunkArray(taskPayload, config.maxTasksPerPost)) {
       const response = await d4s.postSerpTasks(chunk);
-      const postedTasks = (response.tasks || []).flatMap(t => t.result || []);
+      const responseTasks = response.tasks || [];
+      console.log(`DataForSEO response count: ${responseTasks.length}`);
+
+      const postedTasks = responseTasks.flatMap((t) => t.result || []);
       const apiRows = postedTasks.map((t) => ({
         run_id: runId,
         task_id: t.id,
@@ -47,14 +64,18 @@ async function postSerpTasks(req, res) {
         device: t.data?.device || null,
         status: 'posted',
         posted_at: new Date().toISOString(),
+        fetched_at: null,
         created_at: new Date().toISOString(),
         http_code: t.status_code || null,
+        error_message: null,
       }));
+
       await bq.insertApiTasks(apiRows);
+      console.log(`inserted api_tasks count: ${apiRows.length}`);
       totalPosted += apiRows.length;
     }
 
-    console.log(`postSerpTasks run_id=${runId} posted=${totalPosted}`);
+    console.log(`final posted count: ${totalPosted}`);
     return res.status(200).json({ runId, totalPosted });
   } catch (err) {
     console.error('postSerpTasks failed', err);
@@ -106,9 +127,9 @@ async function fetchSerpResults(req, res) {
         }));
 
         const domainPositionRows = parsed.items
-          .filter(r => r.item_type === 'organic' && r.rank_absolute && r.rank_absolute <= 20)
-          .filter(r => r.domain === config.targetDomain || trackedDomains.includes(r.domain))
-          .map(r => ({
+          .filter((r) => r.item_type === 'organic' && r.rank_absolute && r.rank_absolute <= 20)
+          .filter((r) => r.domain === config.targetDomain || trackedDomains.includes(r.domain))
+          .map((r) => ({
             run_id: r.run_id,
             task_id: r.task_id,
             keyword: r.keyword,
@@ -141,12 +162,12 @@ async function fetchSerpResults(req, res) {
 async function postSearchVolumeTasks(req, res) {
   try {
     validateConfig();
-    const keywords = (await bq.getActiveKeywords()).map(r => r.keyword).slice(0, 1000);
+    const keywords = (await bq.getActiveKeywords()).map((r) => r.keyword).slice(0, 1000);
     if (!keywords.length) return res.status(200).json({ message: 'No active keywords found' });
 
     const payload = [{
-      location_name: config.googleLocationName,
-      language_name: config.googleLanguageName,
+      location_code: config.locationCode,
+      language_code: config.languageCode,
       keywords,
     }];
 
@@ -161,8 +182,10 @@ async function postSearchVolumeTasks(req, res) {
       device: null,
       status: 'posted',
       posted_at: new Date().toISOString(),
+      fetched_at: null,
       created_at: new Date().toISOString(),
       http_code: taskObj?.status_code || null,
+      error_message: null,
     }]);
 
     return res.status(200).json({ taskId: taskObj?.id, keywordCount: keywords.length });
@@ -183,7 +206,7 @@ async function fetchSearchVolumeResults(req, res) {
         const data = await d4s.getSearchVolumeTaskResult(task.task_id);
         const payload = (data.tasks || [])[0];
         const result = (payload?.result || [])[0];
-        const rows = (result?.items || []).map(item => ({
+        const rows = (result?.items || []).map((item) => ({
           keyword: item.keyword,
           year: item.year || null,
           month: item.month || null,
