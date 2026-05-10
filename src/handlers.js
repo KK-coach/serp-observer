@@ -53,22 +53,47 @@ async function postSerpTasks(req, res) {
     for (const chunk of chunkArray(taskPayload, config.maxTasksPerPost)) {
       const response = await d4s.postSerpTasks(chunk);
       const responseTasks = response.tasks || [];
+      console.log(`DataForSEO top-level status_code: ${response.status_code}`);
+      console.log(`DataForSEO top-level status_message: ${response.status_message}`);
       console.log(`DataForSEO response count: ${responseTasks.length}`);
 
-      const postedTasks = responseTasks.flatMap((t) => t.result || []);
-      const apiRows = postedTasks.map((t) => ({
+      const firstTask = responseTasks[0] || null;
+      if (firstTask) {
+        console.log(`first task id: ${firstTask.id || null}`);
+        console.log(`first task status_code: ${firstTask.status_code || null}`);
+        console.log(`first task status_message: ${firstTask.status_message || null}`);
+        console.log(`first task has result: ${Boolean(firstTask.result)}`);
+        console.log(`first task keys: ${JSON.stringify(Object.keys(firstTask))}`);
+      }
+
+      const apiRows = responseTasks
+        .map((task, index) => {
+          const payload = chunk[index] || {};
+          const statusCode = Number(task.status_code || 0);
+          const isAccepted = statusCode >= 20000 && statusCode < 30000;
+
+          if (!task.id) return null;
+          if (!isAccepted) {
+            console.warn(
+              `Unaccepted DataForSEO task status_code=${task.status_code} status_message=${task.status_message}`,
+            );
+          }
+
+          return {
         run_id: runId,
-        task_id: t.id,
-        task_type: 'serp_organic_advanced',
-        keyword: t.data?.keyword || null,
-        device: t.data?.device || null,
-        status: 'posted',
+        task_id: task.id,
+        task_type: 'serp',
+        keyword: payload.keyword || task.data?.keyword || null,
+        device: payload.device || task.data?.device || null,
+        status: isAccepted ? 'posted' : 'failed',
         posted_at: new Date().toISOString(),
         fetched_at: null,
         created_at: new Date().toISOString(),
-        http_code: t.status_code || null,
-        error_message: null,
-      }));
+        http_code: task.status_code || null,
+        error_message: isAccepted ? null : (task.status_message || 'Task post not accepted'),
+          };
+        })
+        .filter(Boolean);
 
       await bq.insertApiTasks(apiRows);
       console.log(`inserted api_tasks count: ${apiRows.length}`);
@@ -86,7 +111,7 @@ async function postSerpTasks(req, res) {
 async function fetchSerpResults(req, res) {
   try {
     validateConfig();
-    const tasks = await bq.getPendingApiTasks('serp_organic_advanced');
+    const tasks = await bq.getPendingApiTasks('serp');
     const trackedDomains = await bq.getTrackedDomains();
 
     let completed = 0;
