@@ -14,15 +14,15 @@ Node.js backend for SERP monitoring with DataForSEO and BigQuery, deployed as **
 
 Copy `.env.example` to `.env` for local development.
 
-- `GCP_PROJECT_ID=gen-lang-client-0073794959`
-- `BIGQUERY_DATASET=agrobook_serp_monitor`
+- `GCP_PROJECT_ID=xxx`
+- `BIGQUERY_DATASET=xxx`
 - `BIGQUERY_LOCATION=EU`
 - `LOCATION_CODE=2348`
 - `LANGUAGE_CODE=hu`
 - `SERP_DEVICES=desktop,mobile`
 - `DATAFORSEO_LOGIN=...`
 - `DATAFORSEO_PASSWORD=...`
-- `TARGET_DOMAIN=agrobook.hu`
+- `TARGET_DOMAIN=default.com`
 
 ## Run locally
 
@@ -40,7 +40,7 @@ gcloud run deploy serp-observer \
   --source . \
   --region europe-west1 \
   --allow-unauthenticated \
-  --set-env-vars GCP_PROJECT_ID=gen-lang-client-0073794959,BIGQUERY_DATASET=agrobook_serp_monitor,BIGQUERY_LOCATION=EU,LOCATION_CODE=2348,LANGUAGE_CODE=hu,SERP_DEVICES=desktop,mobile,TARGET_DOMAIN=agrobook.hu \
+  --set-env-vars GCP_PROJECT_ID=xxx,BIGQUERY_DATASET=xxx,BIGQUERY_LOCATION=EU,LOCATION_CODE=2348,LANGUAGE_CODE=hu,SERP_DEVICES=desktop,mobile,TARGET_DOMAIN=default.hu \
   --set-secrets DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
 ```
 
