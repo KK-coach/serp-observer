@@ -1,4 +1,4 @@
-# Agrobook SERP Monitor (Cloud Run Express Service)
+# SERP Monitor (Cloud Run Express Service)
 
 Node.js backend for SERP monitoring with DataForSEO and BigQuery, deployed as **one Cloud Run service** with one Express app.
 
