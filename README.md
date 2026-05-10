@@ -2,6 +2,15 @@
 
 Node.js backend for SERP monitoring with DataForSEO and BigQuery, deployed as **one Cloud Run service** with one Express app.
 
+- Tracks selected keywords in Google SERP
+- Runs separate desktop and mobile checks
+- Uses DataForSEO Standard Queue SERP API
+- Stores task metadata and parsed SERP results in BigQuery
+- Detects tracked domain appearances and ranking positions
+- Supports AI Overview/source fields when available in the SERP response
+- Provides separate endpoints for posting SERP tasks and fetching results
+- Can be connected to Looker Studio for reporting
+
 ## Endpoints
 
 - `GET /health`
