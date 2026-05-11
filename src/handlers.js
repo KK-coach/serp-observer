@@ -53,7 +53,9 @@ async function postSerpTasks(req, res) {
     const runId = await bq.createSerpRun({ run_type: 'weekly_serp', status: 'posted' });
     const taskPayload = [];
 
-    for (const row of keywords) {
+    const limitedKeywords = keywords.slice(0, config.maxSerpTasksPerRun);
+
+    for (const row of limitedKeywords) {
       for (const device of config.serpDevices) {
         taskPayload.push(buildSerpTask(row.keyword, device));
       }
@@ -123,7 +125,7 @@ async function postSerpTasks(req, res) {
 async function fetchSerpResults(req, res) {
   try {
     validateConfig();
-    const tasks = await bq.getPendingApiTasks('serp');
+    const tasks = await bq.getPendingApiTasks('serp', config.fetchBatchLimit);
     const trackedDomains = await bq.getTrackedDomains();
 
     let completed = 0;
@@ -139,7 +141,7 @@ async function fetchSerpResults(req, res) {
           runId: task.run_id,
           keyword: task.keyword,
           device: task.device,
-          targetDomain: config.targetDomain,
+          trackedDomains,
           resultItems: items,
         });
 
@@ -165,7 +167,7 @@ async function fetchSerpResults(req, res) {
 
         const domainPositionRows = parsed.items
           .filter((r) => r.item_type === 'organic' && r.rank_absolute && r.rank_absolute <= 20)
-          .filter((r) => r.domain === config.targetDomain || trackedDomains.includes(r.domain))
+          .filter((r) => trackedDomains.includes(r.domain))
           .map((r) => ({
             run_id: r.run_id,
             task_id: r.task_id,
@@ -235,7 +237,7 @@ async function postSearchVolumeTasks(req, res) {
 async function fetchSearchVolumeResults(req, res) {
   try {
     validateConfig();
-    const tasks = await bq.getPendingApiTasks('search_volume');
+    const tasks = await bq.getPendingApiTasks('search_volume', config.fetchBatchLimit);
     let completed = 0;
 
     for (const task of tasks) {

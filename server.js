@@ -11,7 +11,7 @@ app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (req, res) => {
   console.log('ROUTE HIT: GET /health');
-  res.status(200).json({ ok: true, service: 'serp-observer', timestamp: new Date().toISOString() });
+  res.status(200).json({ ok: true, service: 'serp-monitor', timestamp: new Date().toISOString() });
 });
 
 app.post('/post-serp-tasks', (req, res) => {
@@ -41,6 +41,6 @@ app.use((err, req, res, next) => {
 
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
-  console.log('SERP OBSERVER EXPRESS SERVICE BOOTED');
+  console.log('SERP MONITOR EXPRESS SERVICE BOOTED');
   console.log(`Listening on port ${port}`);
 });

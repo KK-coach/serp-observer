@@ -1,7 +1,7 @@
 {
-  "name": "agrobook-serp-monitor",
+  "name": "serp-monitor",
   "version": "1.0.0",
-  "description": "Cloud Run Express backend for Agrobook SERP monitoring with DataForSEO and BigQuery",
+  "description": "Reusable Cloud Run SERP monitoring backend with DataForSEO and BigQuery",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

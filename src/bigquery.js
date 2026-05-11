@@ -39,15 +39,15 @@ async function insertDomainSnapshots(rows) { if (rows.length) await table('serp_
 async function insertDomainPositions(rows) { if (rows.length) await table('domain_positions').insert(rows); }
 async function insertKeywordMetrics(rows) { if (rows.length) await table('keyword_metrics_monthly').insert(rows); }
 
-async function getPendingApiTasks(taskType) {
+async function getPendingApiTasks(taskType, limit = 50) {
   const query = `
     SELECT *
     FROM \`${config.projectId}.${config.dataset}.api_tasks\`
     WHERE task_type = @taskType AND status IN ('posted','pending')
     ORDER BY created_at
-    LIMIT 500
+    LIMIT @limit
   `;
-  const [rows] = await bq.query({ query, params: { taskType }, location: config.bigQueryLocation });
+  const [rows] = await bq.query({ query, params: { taskType, limit }, location: config.bigQueryLocation });
   return rows;
 }
 

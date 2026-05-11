@@ -39,17 +39,18 @@ function getAiOverviewSources(item) {
   return sources;
 }
 
-function parseSerpItems({ taskId, runId, keyword, device, targetDomain, resultItems }) {
+function parseSerpItems({ taskId, runId, keyword, device, trackedDomains = [], resultItems }) {
   const items = [];
   const aiOverviews = [];
   const aiSources = [];
+  const trackedDomainSet = new Set((trackedDomains || []).map((d) => normalizeDomain(d)).filter(Boolean));
 
   for (const item of resultItems || []) {
     const itemType = item.type || item.item_type || 'unknown';
     const rankAbsolute = item.rank_absolute || null;
     const url = item.url || null;
     const domain = extractDomainFromUrl(url);
-    const isTargetDomain = domain === targetDomain;
+    const isTargetDomain = Boolean(domain && trackedDomainSet.has(domain));
 
     const parsed = {
       run_id: runId,
@@ -95,7 +96,7 @@ function parseSerpItems({ taskId, runId, keyword, device, targetDomain, resultIt
           source_title: sourceTitle,
           source_url: sourceUrl,
           source_domain: sourceDomain,
-          is_target_domain: Boolean(sourceDomain && sourceDomain === normalizeDomain(targetDomain)),
+          is_target_domain: Boolean(sourceDomain && trackedDomainSet.has(sourceDomain)),
           raw_source: JSON.stringify(source),
           fetched_at: new Date().toISOString(),
         });
