@@ -1,92 +1,120 @@
-# Agrobook SERP Monitor (Cloud Functions v2 + BigQuery)
+# SERP Monitor Backend (Cloud Run + Express)
 
-Node.js 22 backend for SERP monitoring MVP using DataForSEO Standard Queue APIs and BigQuery.
+Reusable SERP monitoring backend for any website/project.
 
-## 1) Create BigQuery dataset
+It posts SERP tasks to DataForSEO, stores task metadata in BigQuery, fetches completed SERP results, parses organic and AI Overview data, and persists normalized output for analysis.
 
-```bash
-bq --location=EU mk --dataset agrobook-serp-monitor:agrobook_serp_monitor
-```
+## Endpoints
 
-## 2) Run schema SQL
+- `GET /health`
+- `POST /post-serp-tasks` ⚠️ creates paid DataForSEO tasks
+- `POST /fetch-serp-results`
+- `POST /post-search-volume-tasks`
+- `POST /fetch-search-volume-results`
 
-```bash
-bq query --use_legacy_sql=false < sql/create_tables.sql
-```
+## Required environment variables
 
-## 3) Required environment variables
+- `GCP_PROJECT_ID`
+- `BIGQUERY_DATASET`
+- `BIGQUERY_LOCATION` (default `EU`)
+- `DATAFORSEO_LOGIN`
+- `DATAFORSEO_PASSWORD`
 
-Copy `.env.example` to `.env` for local development.
+## Optional environment variables (with defaults)
 
-- `GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor`
-- `BQ_DATASET=agrobook_serp_monitor`
-- `DATAFORSEO_LOGIN=...`
-- `DATAFORSEO_PASSWORD=...`
-- `TARGET_DOMAIN=agrobook.hu`
-- `GOOGLE_LOCATION_NAME=Hungary`
-- `GOOGLE_LANGUAGE_NAME=Hungarian`
-- `GOOGLE_DOMAIN=google.hu`
+- `LOCATION_CODE=2348`
+- `LANGUAGE_CODE=hu`
+- `SERP_DEVICES=desktop,mobile`
 - `SERP_DEPTH=20`
+- `LOAD_ASYNC_AI_OVERVIEW=false`
+- `FETCH_BATCH_LIMIT=50`
+- `MAX_SERP_TASKS_PER_RUN=300`
+- `ALLOW_REPEAT_SERP_POSTS=false`
 
-> Use Secret Manager for production secrets and map them as env vars in deploy.
+## Configure for any website/project
 
-## 4) Deploy to Google Cloud Functions v2
+1. Insert keywords into `keyword_targets`.
+2. Insert tracked domains into `tracked_domains` (example: `example.com`).
+3. Deploy with your own project and dataset values.
 
-Deploy each HTTP function:
+Example keywords:
+- `example product keyword`
+- `example service keyword`
 
-```bash
-gcloud functions deploy postSerpTasks --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=postSerpTasks --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor,TARGET_DOMAIN=agrobook.hu,GOOGLE_LOCATION_NAME=Hungary,GOOGLE_LANGUAGE_NAME=Hungarian,GOOGLE_DOMAIN=google.hu,SERP_DEPTH=20 --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
+## BigQuery schema
 
-gcloud functions deploy fetchSerpResults --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=fetchSerpResults --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor,TARGET_DOMAIN=agrobook.hu --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
+Use `sql/schema.sql` and replace placeholders:
+- `YOUR_PROJECT_ID`
+- `YOUR_DATASET_ID`
 
-gcloud functions deploy postSearchVolumeTasks --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=postSearchVolumeTasks --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor,GOOGLE_LOCATION_NAME=Hungary,GOOGLE_LANGUAGE_NAME=Hungarian --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
+Core tables:
+- `keyword_targets`
+- `tracked_domains`
+- `serp_runs`
+- `api_tasks`
+- `serp_items`
+- `serp_ai_overviews`
+- `serp_ai_overview_sources`
+- `serp_domain_snapshot`
+- `domain_positions`
+- `keyword_metrics_monthly`
 
-gcloud functions deploy fetchSearchVolumeResults --gen2 --runtime=nodejs22 --region=europe-west1 --trigger-http --allow-unauthenticated --entry-point=fetchSearchVolumeResults --set-env-vars=GOOGLE_CLOUD_PROJECT=agrobook-serp-monitor,BQ_DATASET=agrobook_serp_monitor --set-secrets=DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
+Optional view:
+- `sql/ai_overview_views.sql` → `v_ai_overview_presence`
+
+## Add keywords and tracked domains
+
+```sql
+INSERT INTO `YOUR_PROJECT_ID.YOUR_DATASET_ID.keyword_targets` (keyword, is_active)
+VALUES ('example product keyword', TRUE), ('example service keyword', TRUE);
+
+INSERT INTO `YOUR_PROJECT_ID.YOUR_DATASET_ID.tracked_domains` (domain, is_active)
+VALUES ('example.com', TRUE);
 ```
 
-## 5) Trigger `postSerpTasks`
-
-```bash
-curl -X POST "https://<region>-<project>.cloudfunctions.net/postSerpTasks"
-```
-
-## 6) Trigger `fetchSerpResults`
-
-```bash
-curl -X POST "https://<region>-<project>.cloudfunctions.net/fetchSerpResults"
-```
-
-## 7) Schedule weekly SERP monitoring
-
-Use Cloud Scheduler:
-
-1. Weekly cron for `postSerpTasks` (e.g. Monday 06:00 UTC)
-2. Frequent follow-up cron for `fetchSerpResults` (e.g. every 30 min)
-
-Example:
-
-```bash
-gcloud scheduler jobs create http serp-post-weekly --schedule="0 6 * * 1" --uri="https://<url>/postSerpTasks" --http-method=POST
-
-gcloud scheduler jobs create http serp-fetch-halfhourly --schedule="*/30 * * * *" --uri="https://<url>/fetchSerpResults" --http-method=POST
-```
-
-## 8) Schedule monthly search volume refresh
-
-```bash
-gcloud scheduler jobs create http volume-post-monthly --schedule="0 4 1 * *" --uri="https://<url>/postSearchVolumeTasks" --http-method=POST
-
-gcloud scheduler jobs create http volume-fetch-daily --schedule="0 5 * * *" --uri="https://<url>/fetchSearchVolumeResults" --http-method=POST
-```
-
-## Local testing (Functions Framework)
+## Run locally
 
 ```bash
 npm install
-npm run start:post-serp
-npm run start:fetch-serp
-npm run start:post-volume
-npm run start:fetch-volume
+npm start
 ```
 
-Then call local endpoints with `curl -X POST http://localhost:<port>`.
+## Deploy to Cloud Run
+
+```bash
+gcloud run deploy serp-monitor \
+  --source . \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --set-env-vars GCP_PROJECT_ID=your-gcp-project-id,BIGQUERY_DATASET=serp_monitor,BIGQUERY_LOCATION=EU,LOCATION_CODE=2348,LANGUAGE_CODE=hu,SERP_DEVICES=desktop,mobile,SERP_DEPTH=20,LOAD_ASYNC_AI_OVERVIEW=false,FETCH_BATCH_LIMIT=50,MAX_SERP_TASKS_PER_RUN=300,ALLOW_REPEAT_SERP_POSTS=false \
+  --set-secrets DATAFORSEO_LOGIN=DATAFORSEO_LOGIN:latest,DATAFORSEO_PASSWORD=DATAFORSEO_PASSWORD:latest
+```
+
+## Cloud Scheduler setup
+
+Create HTTP jobs against your Cloud Run base URL:
+- `POST /post-serp-tasks` (e.g. weekly)
+- `POST /fetch-serp-results` (e.g. every 15-30 min)
+- `POST /post-search-volume-tasks` (e.g. monthly)
+- `POST /fetch-search-volume-results` (e.g. daily)
+
+## AI Overview loading (optional)
+
+If `LOAD_ASYNC_AI_OVERVIEW=true`, task payloads include `load_async_ai_overview: true`.
+
+This can increase DataForSEO cost. Recommended rollout:
+1. test 10–20 keywords,
+2. use one device first,
+3. expand only if results are useful.
+
+## Cost safety notes
+
+- `/post-serp-tasks` and `/post-search-volume-tasks` create paid API tasks.
+- Use `MAX_SERP_TASKS_PER_RUN` and narrow `SERP_DEVICES` while validating.
+
+## Migration note
+
+Existing deployments must explicitly set:
+- `GCP_PROJECT_ID`
+- `BIGQUERY_DATASET`
+- `BIGQUERY_LOCATION`
