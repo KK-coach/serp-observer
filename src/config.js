@@ -15,6 +15,7 @@ const config = {
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean),
   maxTasksPerPost: Number(process.env.MAX_TASKS_PER_POST || 100),
+  loadAsyncAiOverview: ['true', '1', 'yes'].includes((process.env.LOAD_ASYNC_AI_OVERVIEW || '').trim().toLowerCase()),
 };
 
 function validateConfig() {

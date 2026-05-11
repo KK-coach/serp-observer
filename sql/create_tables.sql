@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS `agrobook-serp-monitor.agrobook_serp_monitor.serp_ai_
   source_title STRING,
   source_url STRING,
   source_domain STRING,
+  is_target_domain BOOL,
   raw_source JSON,
   fetched_at TIMESTAMP
 );

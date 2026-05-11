@@ -10,7 +10,7 @@ function chunkArray(arr, size) {
 }
 
 function buildSerpTask(keyword, device) {
-  return {
+  const payload = {
     keyword,
     location_code: config.locationCode,
     language_code: config.languageCode,
@@ -18,6 +18,12 @@ function buildSerpTask(keyword, device) {
     os: device === 'mobile' ? 'android' : 'windows',
     depth: config.serpDepth,
   };
+
+  if (config.loadAsyncAiOverview) {
+    payload.load_async_ai_overview = true;
+  }
+
+  return payload;
 }
 
 async function postSerpTasks(req, res) {
@@ -35,6 +41,12 @@ async function postSerpTasks(req, res) {
     console.log(`active keyword count: ${keywords.length}`);
     console.log(`active tracked domain count: ${trackedDomains.length}`);
     console.log(`devices: ${JSON.stringify(config.serpDevices)}`);
+    console.log(`LOAD_ASYNC_AI_OVERVIEW: ${config.loadAsyncAiOverview}`);
+    if (config.loadAsyncAiOverview) {
+      console.log('Adding load_async_ai_overview=true to SERP task payloads');
+    } else {
+      console.log('Not adding load_async_ai_overview to SERP task payloads');
+    }
 
     if (!keywords.length) return res.status(200).json({ message: 'No active keywords found' });
 
