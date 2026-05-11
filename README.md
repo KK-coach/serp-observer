@@ -94,7 +94,7 @@ gcloud run deploy serp-monitor \
 
 Create HTTP jobs against your Cloud Run base URL:
 - `POST /post-serp-tasks` (e.g. weekly)
-- `POST /fetch-serp-results` (e.g. every 15-30 min)
+- `POST /fetch-serp-results` (e.g. weekly 90 minutes after the serp task)
 - `POST /post-search-volume-tasks` (e.g. monthly)
 - `POST /fetch-search-volume-results` (e.g. daily)
 
