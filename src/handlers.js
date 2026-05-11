@@ -101,6 +101,7 @@ async function postSerpTasks(req, res) {
         device: payload.device || task.data?.device || null,
         status: isAccepted ? 'posted' : 'failed',
         posted_at: new Date().toISOString(),
+        fetched_at: null,
         created_at: new Date().toISOString(),
         http_code: task.status_code || null,
         error_message: isAccepted ? null : (task.status_message || 'Task post not accepted'),

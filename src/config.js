@@ -15,6 +15,7 @@ const config = {
   maxSerpTasksPerRun: Number(process.env.MAX_SERP_TASKS_PER_RUN || 300),
   allowRepeatSerpPosts: ['true', '1', 'yes'].includes((process.env.ALLOW_REPEAT_SERP_POSTS || '').trim().toLowerCase()),
   maxTasksPerPost: Number(process.env.MAX_TASKS_PER_POST || 100),
+  loadAsyncAiOverview: ['true', '1', 'yes'].includes((process.env.LOAD_ASYNC_AI_OVERVIEW || '').trim().toLowerCase()),
 };
 
 function validateConfig() {
